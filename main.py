@@ -48,11 +48,37 @@ def createDigit():
         digit[h//2 + i + 1][w - 1] = index
         index += 1
     
+    # Across to left
     for i in range(w - 2):
         digit[h - 1][w - i - 2] = index
         index += 1
+
+    # Print the digit
+    for i in range(h):
+        for j in range(w):
+            print(digit[i][j], end=" ")
+        print()
     
     return digit
+
+def writeDigit(digit, number=0):
+    h, w = digit.shape
+    
+    top = digit[0][:]
+    left_top = digit[0: h//2, 0]
+    left_bottom = digit[h//2: h, 0]
+    middle = digit[h//2: h//2 + 2, 1: w - 1].flatten()
+    right_top = digit[0: h//2, w - 1]
+    right_bottom = digit[h//2: h, w - 1]
+    bottom = digit[h - 1][:]
+    
+    top_indexes = di
+    
+    if number == 1:
+        mask = np.zeros((h, w), dtype=int)
+        # Use right_top and right_bottom to create mask
+    
+    print(middle)
 
 def changeColumn(strip, digit):
     h, w = digit.shape
@@ -129,22 +155,24 @@ def theaterChaseRainbow(strip, wait_ms=50):
 if __name__ == '__main__':
     digit = createDigit()
     
-    changeColumn(digit)
-    
     # Process arguments
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
-    # args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
+    args = parser.parse_args()
 
     # # Create NeoPixel object with appropriate configuration.
-    # strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+    strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
     # # Intialize the library (must be called once before other functions).
-    # strip.begin()
+    strip.begin()
 
-    # print ('Press Ctrl-C to quit.')
-    # if not args.clear:
-    #     print('Use "-c" argument to clear LEDs on exit')
+    print ('Press Ctrl-C to quit.')
+    if not args.clear:
+        print('Use "-c" argument to clear LEDs on exit')
 
+    changeColumn(digit)
+    
+    # writeDigit(digit)
+    
     # try:
 
     #     while True:
