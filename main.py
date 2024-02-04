@@ -80,7 +80,7 @@ def writeDigit(digit, number=0):
     
     print(middle)
 
-def changeColumn(strip, digit):
+def changeColumn(strip, digit, wait_ms=50):
     h, w = digit.shape
     
     for i in range(w):
@@ -88,11 +88,12 @@ def changeColumn(strip, digit):
         
         for index in column:
             if index != 0:
+                print(f"Col {i} led: {index - 1}")
                 strip.setPixelColor(int(index - 1), Color(255, 0, 0))
-                
+        
         strip.show()
 
-        time.sleep(0.3)
+        time.sleep(wait_ms * 2/1000)
 
 # Define functions which animate LEDs in various ways.
 def colorWipe(strip, color, wait_ms=50):
@@ -160,15 +161,15 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
     args = parser.parse_args()
 
-    # # Create NeoPixel object with appropriate configuration.
+    # Create NeoPixel object with appropriate configuration.
     strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
-    # # Intialize the library (must be called once before other functions).
+    # Intialize the library (must be called once before other functions).
     strip.begin()
 
     print ('Press Ctrl-C to quit.')
     if not args.clear:
         print('Use "-c" argument to clear LEDs on exit')
-
+        
     changeColumn(strip, digit)
     
     # writeDigit(digit)
