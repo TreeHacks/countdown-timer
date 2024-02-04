@@ -1,7 +1,8 @@
 import time
-from rpi_ws281x import *
+#from rpi_ws281x import *
 import argparse
 import numpy as np
+import math
 
 # LED strip configuration:
 LED_COUNT      = 30     # Number of LED pixels.
@@ -14,43 +15,38 @@ LED_INVERT     = False   # True to invert the signal (when using NPN transistor 
 LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
 def createDigit():
-    w, h = 39, 75
+    w, h = 43, 88
     digit = np.zeros((h, w), dtype=int)
     index = 1
-
-    # Upper left, bottom to top
+        
+    # Across to right
+    for i in range(w - 2):
+        digit[h//2][i + 1] = index
+        index += 1
+        
+    # Up to top right
+    for i in range(h//2 + 1):
+        digit[h//2 - i][w - 1] = index
+        index += 1
+        
+    # Across to left
+    for i in range(w - 2):
+        digit[0][w - i - 2] = index
+        index += 1
+        
+    # Down to bottom left
     for i in range(h):
-        digit[74 - i][0] = index
-        index += 1
-        
-    # Across to right
-    for i in range(w - 1):
-        digit[0][i + 1] = index
-        index += 1
-        
-    # Down to half
-    for i in range(h//2):
-        digit[i + 1][w - 1] = index
-        index += 1
-        
-    # Across to left
-    for i in range(w - 2):
-        digit[h//2][w - i - 2] = index
+        digit[i][0] = index
         index += 1
         
     # Across to right
     for i in range(w - 2):
-        digit[h//2 + 1][i + 1] = index
+        digit[h - 1][i + 1] = index
         index += 1
         
-    # Down to bottom
-    for i in range(h//2):
-        digit[h//2 + i + 1][w - 1] = index
-        index += 1
-    
-    # Across to left
-    for i in range(w - 2):
-        digit[h - 1][w - i - 2] = index
+    # Up to middle right
+    for i in range(math.ceil(h/2 - 1)):
+        digit[h - 1 - i][w - 1] = index
         index += 1
 
     # Print the digit
@@ -61,24 +57,92 @@ def createDigit():
     
     return digit
 
-def writeDigit(digit, number=0):
+def writeDigit(digit, number=9):
+    """
+    Set the digit to a number from 0 to 9 using the digit mask
+    """
+    
     h, w = digit.shape
     
-    top = digit[0][:]
-    left_top = digit[0: h//2, 0]
-    left_bottom = digit[h//2: h, 0]
-    middle = digit[h//2: h//2 + 2, 1: w - 1].flatten()
-    right_top = digit[0: h//2, w - 1]
-    right_bottom = digit[h//2: h, w - 1]
-    bottom = digit[h - 1][:]
+    middle = np.s_[h//2, 1:w-1]
+    right_top = np.s_[:h//2 + 1, w-1]
+    top = np.s_[0, 1:w - 1]
+    left_top = np.s_[:h//2 + 1, 0]
+    left_bottom = np.s_[h//2 + 1:, 0]
+    bottom = np.s_[h - 1, 1:w - 1]
+    right_bottom = np.s_[h//2 + 1:, w-1]
     
-    top_indexes = di
+    mask = np.zeros((h, w), dtype=int)
     
-    if number == 1:
-        mask = np.zeros((h, w), dtype=int)
-        # Use right_top and right_bottom to create mask
+    if number == 0:
+        mask[right_bottom] = 1
+        mask[left_top] = 1
+        mask[top] = 1
+        mask[right_top] = 1
+        mask[left_bottom] = 1
+        mask[bottom] = 1
+    elif number == 1:
+        mask[right_top]= 1
+        mask[right_bottom] = 1
+    elif number == 2:
+        mask[middle] = 1
+        mask[right_top] = 1
+        mask[left_bottom] = 1
+        mask[top] = 1
+        mask[bottom] = 1
+    elif number == 3:
+        mask[middle] = 1
+        mask[right_top] = 1
+        mask[top] = 1
+        mask[bottom] = 1
+        mask[right_bottom] = 1
+    elif number == 4:
+        mask[left_top] = 1
+        mask[middle] = 1
+        mask[right_top] = 1
+        mask[right_bottom] = 1
+    elif number == 5:
+        mask[middle] = 1
+        mask[left_top] = 1
+        mask[top] = 1
+        mask[bottom] = 1
+        mask[right_bottom] = 1
+    elif number == 6:
+        mask[middle] = 1
+        mask[left_top] = 1
+        mask[top] = 1
+        mask[bottom] = 1
+        mask[left_bottom] = 1
+        mask[right_bottom] = 1
+    elif number == 7:
+        mask[top] = 1
+        mask[right_top] = 1
+        mask[right_bottom] = 1
+    elif number == 8:
+        mask[middle] = 1
+        mask[left_top] = 1
+        mask[top] = 1
+        mask[bottom] = 1
+        mask[left_bottom] = 1
+        mask[right_bottom] = 1
+        mask[right_top] = 1
+    elif number == 9:
+        mask[middle] = 1
+        mask[left_top] = 1
+        mask[top] = 1
+        mask[bottom] = 1
+        mask[right_bottom] = 1
+        mask[middle] = 1
+        mask[right_top] = 1
+        
+    digit = np.where(mask, digit, 0)
     
-    print(middle)
+    print()
+    
+    for i in range(h):
+        for j in range(w):
+            print(mask[i][j], end=" ")
+        print()
 
 def changeColumn(strip, digit, wait_ms=50):
     h, w = digit.shape
@@ -156,6 +220,9 @@ def theaterChaseRainbow(strip, wait_ms=50):
 if __name__ == '__main__':
     digit = createDigit()
     
+    writeDigit(digit)
+    changeColumn(strip, digit)
+    
     # Process arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
@@ -170,9 +237,6 @@ if __name__ == '__main__':
     if not args.clear:
         print('Use "-c" argument to clear LEDs on exit')
         
-    changeColumn(strip, digit)
-    
-    # writeDigit(digit)
     
     # try:
 
