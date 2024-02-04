@@ -88,7 +88,7 @@ def changeColumn(strip, digit):
         
         for index in column:
             if index != 0:
-                strip.setPixelColor(index - 1, Color(255, 0, 0))
+                strip.setPixelColor(int(index - 1), Color(255, 0, 0))
                 
         strip.show()
 
