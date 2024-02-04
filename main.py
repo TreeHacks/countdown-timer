@@ -169,7 +169,7 @@ if __name__ == '__main__':
     if not args.clear:
         print('Use "-c" argument to clear LEDs on exit')
 
-    changeColumn(digit)
+    changeColumn(strip, digit)
     
     # writeDigit(digit)
     
