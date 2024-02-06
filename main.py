@@ -3,6 +3,9 @@ import time
 import argparse
 import numpy as np
 import math
+from datetime import datetime
+import threading
+import rainbow
 
 # LED strip configuration:
 LED_COUNT      = 30     # Number of LED pixels.
@@ -13,6 +16,28 @@ LED_DMA        = 10      # DMA channel to use for generating a signal (try 10)
 LED_BRIGHTNESS = 65      # Set to 0 for darkest and 255 for brightest
 LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
 LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
+
+def printArray(array):
+    shape = array.shape
+    
+    for i in range(shape[0]):
+        for j in range(shape[1]):
+            print(array[i][j], end=" ")
+        print()
+        
+def runDigit(strip, wait_ms=50):
+    global digit
+    
+    while True:
+        now = datetime.now()
+        current_time = now.strftime("%H:%M:%S")
+        print("Current Time =", current_time)
+
+        writeDigit(int(current_time[-1]))
+        
+        #printArray(digit)
+
+        time.sleep(1)
 
 def createDigit():
     w, h = 43, 88
@@ -48,19 +73,15 @@ def createDigit():
     for i in range(math.ceil(h/2 - 1)):
         digit[h - 1 - i][w - 1] = index
         index += 1
-
-    # Print the digit
-    for i in range(h):
-        for j in range(w):
-            print(digit[i][j], end=" ")
-        print()
     
     return digit
 
-def writeDigit(digit, number=9):
+def writeDigit(number=0):
     """
     Set the digit to a number from 0 to 9 using the digit mask
     """
+    global lock
+    global digit
     
     h, w = digit.shape
     
@@ -73,6 +94,8 @@ def writeDigit(digit, number=9):
     right_bottom = np.s_[h//2 + 1:, w-1]
     
     mask = np.zeros((h, w), dtype=int)
+    
+    lock.acquire()
     
     if number == 0:
         mask[right_bottom] = 1
@@ -132,17 +155,66 @@ def writeDigit(digit, number=9):
         mask[top] = 1
         mask[bottom] = 1
         mask[right_bottom] = 1
-        mask[middle] = 1
         mask[right_top] = 1
         
-    digit = np.where(mask, digit, 0)
+    digit = np.where(mask, digit_indices, 0)
     
-    print()
+    lock.release()
     
-    for i in range(h):
-        for j in range(w):
-            print(mask[i][j], end=" ")
+def patterns(strip, wait_ms=50):
+    global digit
+    
+    h, w = digit.shape
+    
+    #colors = 
+    
+    index = 0
+    
+    while True:
+        #printArray(digit)
+        #print()
+        
+        # Rainbow
+        for j in range(256):
+            for i in range(w):
+                color = wheel_tuple((index+j) & 255)
+                
+                #print(f"Col {i} color: {color}")
+                rainbow.print(f"Col {index} color: {color}", color=rgb_to_hex(color))
+                
+                index += 1
+                
+                time.sleep(wait_ms * 2/1000)
+
+            time.sleep(1)
         print()
+            
+def rgb_to_hex(color):
+  """Converts an RGB color to a hexadecimal string.
+
+  Args:
+    r: The red component of the color, in the range 0-255.
+    g: The green component of the color, in the range 0-255.
+    b: The blue component of the color, in the range 0-255.
+
+  Returns:
+    A hexadecimal string representing the color, in the format #RRGGBB.
+  """
+  
+  r, g, b = color
+
+  return '#{:02x}{:02x}{:02x}'.format(r, g, b)
+    
+def wheel_tuple(pos):
+    """Generate rainbow colors across 0-255 positions."""
+    if pos < 85:
+        return (pos * 3, 255 - pos * 3, 0)
+    elif pos < 170:
+        pos -= 85
+        return (255 - pos * 3, 0, pos * 3)
+    else:
+        pos -= 170
+        return (0, pos * 3, 255 - pos * 3)
 
 def changeColumn(strip, digit, wait_ms=50):
     h, w = digit.shape
@@ -189,7 +261,7 @@ def wheel(pos):
         pos -= 170
         return Color(0, pos * 3, 255 - pos * 3)
 
-def rainbow(strip, wait_ms=20, iterations=1):
+def rainbow_(strip, wait_ms=20, iterations=1):
     """Draw rainbow that fades across all pixels at once."""
     for j in range(256*iterations):
         for i in range(strip.numPixels()):
@@ -216,6 +288,21 @@ def theaterChaseRainbow(strip, wait_ms=50):
             for i in range(0, strip.numPixels(), 3):
                 strip.setPixelColor(i+q, 0)
 
+digit_indices = createDigit()
+digit = np.zeros_like(digit_indices)
+strip = None
+lock = threading.Lock()
+
+t1 = threading.Thread(target=runDigit, args=(strip, 50))
+t2 = threading.Thread(target=patterns, args=(strip, 50))
+
+t1.start()
+t2.start()
+
+t1.join()
+t2.join()
+
+"""
 # Main program logic follows:
 if __name__ == '__main__':
     digit = createDigit()
@@ -257,3 +344,4 @@ if __name__ == '__main__':
     # except KeyboardInterrupt:
     #     if args.clear:
     #         colorWipe(strip, Color(0,0,0), 10)
+"""
