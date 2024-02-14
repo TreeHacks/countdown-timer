@@ -6,6 +6,7 @@ import math
 from datetime import datetime
 import threading
 import rainbow
+import sys
 
 # LED strip configuration:
 LED_COUNT      = 30     # Number of LED pixels.
@@ -31,7 +32,7 @@ def runDigit(strip, wait_ms=50):
     while True:
         now = datetime.now()
         current_time = now.strftime("%H:%M:%S")
-        print("Current Time =", current_time)
+        # print("Current Time =", current_time)
 
         writeDigit(int(current_time[-1]))
         
@@ -156,9 +157,21 @@ def writeDigit(number=0):
         mask[bottom] = 1
         mask[right_bottom] = 1
         mask[right_top] = 1
-        
+    
+    # Create a mask of the digit    
     digit = np.where(mask, digit_indices, 0)
     
+    # Create the anti-mask of the digit
+    anti_mask = np.where(mask, 0, digit_indices)
+
+    # Turn off the LEDs that are not part of the digit
+    # for i in range(h):
+    #     for j in range(w):
+    #         if digit[i][j] == 0:
+    #             strip.setPixelColor(int(anti_mask[i][j] - 1), Color(0, 0, 0))
+
+    # strip.show()
+
     lock.release()
     
 def patterns(strip, wait_ms=50):
@@ -170,24 +183,39 @@ def patterns(strip, wait_ms=50):
     
     index = 0
     
+    print()
+    
     while True:
         #printArray(digit)
         #print()
         
         # Rainbow
         for j in range(256):
-            for i in range(w):
+            arr = (digit != 0).astype(int)
+            
+            if j > 0:
+                # Move cursor h rows up in terminal
+                sys.stdout.write("\033[F" * (h-1))
+                    
+            for i in range(h):
                 color = wheel_tuple((index+j) & 255)
+                color = rgb_to_hex(color)
                 
                 #print(f"Col {i} color: {color}")
-                rainbow.print(f"Col {index} color: {color}", color=rgb_to_hex(color))
+                # rainbow.print(f"Col {index} color: {color}", color=color)
                 
-                index += 1
+                for k in range(w):
+                    if arr[i][k]:
+                        rainbow.print(f"1 ", color=color, end="")
+                    else:
+                        rainbow.print(f"  ", color=color, end="")
                 
-                time.sleep(wait_ms * 2/1000)
-
-            time.sleep(1)
-        print()
+                if i < h - 1:  
+                    print()
+                
+                index = (index + 1) % 256
+                
+            time.sleep(wait_ms * 3/1000)
             
 def rgb_to_hex(color):
   """Converts an RGB color to a hexadecimal string.
