@@ -66,12 +66,12 @@ def createDigit(start_index=1, w=37, h=75):
     index of the LED on the strip. 
     
     NOTE: The indices are 1-indexed, so the first index is 1, not 0. This is to
-    avoid confusion with 0 being no LED.
+    avoid confusion with 0 being no LED in the sparse digit matrix.
 
     Args:
         start_index (int, optional): The starting index for the LED strip. Defaults to 1.
-        w (int, optional): The width of the digit. 
-        h (int, optional): The height of the digit.
+        w (int, optional): The width of the digit (number of columns).
+        h (int, optional): The height of the digit (number of rows).
         
     Returns:
         np.array: A sparse matrix of indices representing the digit.
