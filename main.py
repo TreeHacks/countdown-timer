@@ -270,10 +270,10 @@ def rainbow(wait_ms=50):
     for j in range(256): # One cycle of all 256 colors in the wheel
         height_arr = list(range(h))
                 
-        for digit_index in range(n):
-            for r in height_arr:
-                strip_color = wheel((r + j) & 255) # Get the color for the row (shifted by j to make it move)
-                
+        for r in height_arr:
+            strip_color = wheel((r + j) & 255) # Get the color for the row (shifted by j to make it move)
+            
+            for digit_index in range(n):
                 for c in range(w):
                     change_color(strip_color, digit_index, r, c)
                 
@@ -353,7 +353,7 @@ def changeColumn(strip, digit, wait_ms=50):
         
         strip.show()
 
-        time.sleep(wait_ms * 2/1000)
+        time.sleep(wait_ms/1000)
 
 # Define functions which animate LEDs in various ways.
 def colorWipe(strip, color, wait_ms=50):
@@ -407,7 +407,7 @@ digit_indices = [createDigit(1 + i * 300) for i in range(num_digits)]
 digit_indices = np.array(digit_indices)
 digit = np.zeros_like(digit_indices)
 
-color_cache = [[[0] * digit.shape[1] for i in range(digit.shape[0])] for j in range(len(digit_indices))]
+color_cache = [[[0] * digit.shape[1] for i in range(digit.shape[0])] for j in range(num_digits)]
 
 strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
 strip.begin()
