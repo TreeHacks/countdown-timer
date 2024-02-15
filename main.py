@@ -19,6 +19,13 @@ LED_INVERT     = False   # True to invert the signal (when using NPN transistor 
 LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
 def printArray(array):
+    """
+    Print the given array to the console.
+
+    Args:
+        array (np.array): The array to print.
+    """
+    
     shape = array.shape
     
     for i in range(shape[0]):
@@ -26,15 +33,21 @@ def printArray(array):
             print(array[i][j], end=" ")
         print()
         
-def runDigit(strip, wait_ms=50):
+def runDigit():
+    """
+    Run the digit on the LED strip. This function will update the digit to display the current time
+    and then write the digit to the LED strip.
+    """
+    
     global digit
+    global strip
     
     while True:
         now = datetime.now()
-        current_time = now.strftime("%H:%M:%S")
+        current_time = now.strftime("%H%M%S")
         # print("Current Time =", current_time)
 
-        writeDigit(int(current_time[-1]))
+        updateDigit(current_time)
         
         #printArray(digit)
         
@@ -46,53 +59,82 @@ def runDigit(strip, wait_ms=50):
 
         time.sleep(0.05)
 
-def createDigit():
-    w, h = 37, 75
-    digit = np.zeros((h, w), dtype=int)
-    index = 1
+def createDigit(start_index=1, w=37, h=75):
+    """
+    Create a sparse matrix of indices that represent a digit on the LED strip. A 0 
+    means there's no LED at that position, and a positive integer represents the
+    index of the LED on the strip. 
+    
+    NOTE: The indices are 1-indexed, so the first index is 1, not 0. This is to
+    avoid confusion with 0 being no LED.
+
+    Args:
+        start_index (int, optional): The starting index for the LED strip. Defaults to 1.
+        w (int, optional): The width of the digit. 
+        h (int, optional): The height of the digit.
+        
+    Returns:
+        np.array: A sparse matrix of indices representing the digit.
+    """
+    
+    new_digit = np.zeros((h, w), dtype=int)
+    index = start_index
         
     # Across to right
     for i in range(w - 2):
-        digit[h//2][i + 1] = index
+        new_digit[h//2][i + 1] = index
         index += 1
         
     # Up to top right
     for i in range(h//2 + 1):
-        digit[h//2 - i][w - 1] = index
+        new_digit[h//2 - i][w - 1] = index
         index += 1
         
     # Across to left
     for i in range(w - 2):
-        digit[0][w - i - 2] = index
+        new_digit[0][w - i - 2] = index
         index += 1
         
     # Down to bottom left
     for i in range(h):
-        digit[i][0] = index
+        new_digit[i][0] = index
         index += 1
         
     # Across to right
     for i in range(w - 2):
-        digit[h - 1][i + 1] = index
+        new_digit[h - 1][i + 1] = index
         index += 1
         
     # Up to middle right
     for i in range(math.ceil(h/2 - 1)):
-        digit[h - 1 - i][w - 1] = index
+        new_digit[h - 1 - i][w - 1] = index
         index += 1
     
-    return digit
+    return new_digit
 
-def writeDigit(number=0):
+def writeDigit(digit_index, number):
     """
-    Set the digit to a number from 0 to 9 using the digit mask
+    For a given digit, write the number to the digit mask. The number is written
+    by turning on the LEDs that are part of the number and turning off the LEDs
+    that are not part of the number. This is done by creating a mask of 1s and 0s
+    and then using the mask to turn on and off the LEDs.
+    
+    Args:
+        digit_index (int): The index of the digit to write to.
+        number (int): The number to write to the digit.
+        
     """
-    global lock
+    
     global digit
     global color_cache
+    global digit_indices
     
-    h, w = digit.shape
+    h, w = digit[digit_index].shape
     
+    """
+    Numpy slice objects for the different parts of the digit - the LEDs start in the middle 
+    and to the right, and then go counter-clockwise around the digit
+    """
     middle = np.s_[h//2, 1:w-1]
     right_top = np.s_[:h//2 + 1, w-1]
     top = np.s_[0, 1:w - 1]
@@ -102,8 +144,6 @@ def writeDigit(number=0):
     right_bottom = np.s_[h//2 + 1:, w-1]
     
     mask = np.zeros((h, w), dtype=int)
-    
-    lock.acquire()
     
     if number == 0:
         mask[right_bottom] = 1
@@ -165,85 +205,81 @@ def writeDigit(number=0):
         mask[right_bottom] = 1
         mask[right_top] = 1
     
-    # Create a mask of the digit    
-    digit = np.where(mask, digit_indices, 0)
+    # Get the indices of the LEDs that are part of the digit
+    digit[digit_index] = np.where(mask, digit_indices[digit_index], 0)
     
-    # Turn on the LEDs that are part of the digit
-    for i in range(h):
-        for j in range(w):
-            if digit[i][j] != 0:
-                cached = color_cache[i][j]
+    # Turn on the LEDs that are part of the digit (should be on)
+    for r in range(h):
+        for c in range(w):
+            if digit[digit_index][r][c] != 0:
+                cached = color_cache[r][c]
                 if cached != 0:
-                    strip.setPixelColor(int(digit[i][j] - 1), cached)
-    
-    # Create the anti-mask of the digit
-    anti_mask = np.where(mask, 0, digit_indices)
+                    strip.setPixelColor(int(digit[digit_index][r][c] - 1), cached)
+
+    # Create the anti-digit that gets the leds that are not part of the digit (should be off)
+    anti_digit = np.where(mask, 0, digit_indices[digit_index])
 
     # Turn off the LEDs that are not part of the digit
-    for i in range(h):
-        for j in range(w):
-            if digit[i][j] == 0:
-                strip.setPixelColor(int(anti_mask[i][j] - 1), Color(0, 0, 0))
+    for r in range(h):
+        for c in range(w):
+            if digit[digit_index][r][c] == 0:
+                strip.setPixelColor(int(anti_digit[r][c] - 1), Color(0, 0, 0))
 
     strip.show()
-
-    lock.release()
     
-def patterns(strip, wait_ms=50):
+def updateDigit(current_time):
+    """
+    Given the current time, update all the digits to display the current time. This is done
+    by writing each digit to the LED strip.
+    
+    Args:
+        current_time (str): The current time in the format HHMMSS.
+    """
+    
+    global lock
     global digit
+    global digit_indices
+    global color_cache
     
-    h, w = digit.shape
+    lock.acquire() # Lock the thread so that the digit can be updated (mainly to stop patterns from updating the digit at the same time)
     
-    #colors = 
+    for i in range(len(digit)):
+        writeDigit(i, int(current_time[i]))
+     
+    lock.release() # Release the lock so that the digit can be updated by another thread
+
+def patterns(wait_ms=50):
+    """
+    Run the patterns on the LED strip. This function will run the patterns on the LED strip
+    and update the digit to display the current time.
+    """
     
-    index = 0
-    
-    print()
+    global digit
+    global strip
+     
+    n, h, w = digit.shape # Number of digits, height, width
     
     while True:
-        #printArray(digit)
-        #print()
-        
         # Rainbow
-        for j in range(256):
-            arr = (digit != 0).astype(int)
+        rainbow(wait_ms)
             
-            if j > 0:
-                # Move cursor h rows up in terminal
-                sys.stdout.write("\033[F" * (h-1))
-                    
-            height_arr = list(range(h))
-            #height_arr.reverse() if j % 2 == 0 else height_arr
-                    
-            for i in height_arr:
-                color = wheel_tuple((i+j) & 255)
-                color = rgb_to_hex(color)
+def rainbow(wait_ms=50):
+    global digit
+    global strip
+    
+    for j in range(256): # One cycle of all 256 colors in the wheel
+        height_arr = list(range(h))
                 
-                strip_color = wheel((i + 3 * j) & 255)
+        for digit_index in range(n):
+            for r in height_arr:
+                strip_color = wheel((r + j) & 255) # Get the color for the row (shifted by j to make it move)
                 
-                #print(f"Col {i} color: {color}")
-                # rainbow.print(f"Col {index} color: {color}", color=color)
+                for c in range(w):
+                    change_color(strip_color, digit_index, r, c)
                 
-                for k in range(w):
-                    #strip.setPixelColor(int(digit[i][k] - 1), strip_color)
-                
-                    change_color(strip_color, i, k)
-                    
-                """
-                for k in range(w):
-                    if arr[i][k]:
-                        rainbow.print(f"1 ", color=color, end="")
-                    else:
-                        rainbow.print(f"  ", color=color, end="")
-                
-                if i < h - 1:  
-                    print()
-                """
-                index = (index + 1) % 256
-                
-                strip.show()
-                
-                time.sleep(wait_ms * 1/1000)
+            strip.show() # Show the changes to the strip
+            
+            time.sleep(wait_ms/1000) # Wait for a bit before moving to the next row
             
 def rgb_to_hex(color):
   """Converts an RGB color to a hexadecimal string.
@@ -261,23 +297,49 @@ def rgb_to_hex(color):
 
   return '#{:02x}{:02x}{:02x}'.format(r, g, b)
     
-def wheel_tuple(pos):
-    """Generate rainbow colors across 0-255 positions."""
+def change_color(color, n, r, c):
+    """
+    Change the color of the LED at the given position
+
+    Args:
+        color (Color): The color to change the LED to (RGB)
+        n (int): The digit index
+        r (int): The row index
+        c (int): The column index
+    """
+
+    global color_cache
+    global digit
+
+    color_cache[n][r][c] = color
+    strip.setPixelColor(int(digit[n][r][c] - 1), color)
+
+def wheel(pos, use_tuple=False):
+    """
+    Generate rainbow colors across 0-255 positions.
+    
+    Args:
+        pos (int): The position in the rainbow.
+        use_tuple (bool): Toggle the return of Color or tuple.
+        
+    Returns:
+        Color or tuple: The color at the given position.
+    """
+    
     if pos < 85:
-        return (pos * 3, 255 - pos * 3, 0)
+        color = (pos * 3, 255 - pos * 3, 0)
     elif pos < 170:
         pos -= 85
-        return (255 - pos * 3, 0, pos * 3)
+        color = (255 - pos * 3, 0, pos * 3)
     else:
         pos -= 170
-        return (0, pos * 3, 255 - pos * 3)
+        color = (0, pos * 3, 255 - pos * 3)
 
-def change_color(color, r, c):
-    global color_cache
-
-    color_cache[r][c] = color
-    strip.setPixelColor(int(digit[r][c] - 1), color)
-
+    if use_tuple:
+        return color
+    else:
+        return Color(*color)
+        
 def changeColumn(strip, digit, wait_ms=50):
     h, w = digit.shape
     
@@ -312,17 +374,6 @@ def theaterChase(strip, color, wait_ms=50, iterations=10):
             for i in range(0, strip.numPixels(), 3):
                 strip.setPixelColor(i+q, 0)
 
-def wheel(pos):
-    """Generate rainbow colors across 0-255 positions."""
-    if pos < 85:
-        return Color(pos * 3, 255 - pos * 3, 0)
-    elif pos < 170:
-        pos -= 85
-        return Color(255 - pos * 3, 0, pos * 3)
-    else:
-        pos -= 170
-        return Color(0, pos * 3, 255 - pos * 3)
-
 def rainbow_(strip, wait_ms=20, iterations=1):
     """Draw rainbow that fades across all pixels at once."""
     for j in range(256*iterations):
@@ -350,62 +401,24 @@ def theaterChaseRainbow(strip, wait_ms=50):
             for i in range(0, strip.numPixels(), 3):
                 strip.setPixelColor(i+q, 0)
 
-digit_indices = createDigit()
+num_digits = 6
+
+digit_indices = [createDigit(1 + i * 300) for i in range(num_digits)]
+digit_indices = np.array(digit_indices)
 digit = np.zeros_like(digit_indices)
-color_cache = [[0 for i in range(digit.shape[1])] for j in range(digit.shape[0])]
-lock = threading.Lock()
+
+color_cache = [[[0] * digit.shape[1] for i in range(digit.shape[0])] for j in range(len(digit_indices))]
 
 strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
 strip.begin()
 
-t1 = threading.Thread(target=runDigit, args=(strip, 50))
-t2 = threading.Thread(target=patterns, args=(strip, 50))
+lock = threading.Lock()
+
+t1 = threading.Thread(target=runDigit, args=(50))
+t2 = threading.Thread(target=patterns, args=(50))
 
 t1.start()
 t2.start()
 
 t1.join()
 t2.join()
-
-"""
-# Main program logic follows:
-if __name__ == '__main__':
-    digit = createDigit()
-    
-    writeDigit(digit)
-    changeColumn(strip, digit)
-    
-    # Process arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
-    args = parser.parse_args()
-
-    # Create NeoPixel object with appropriate configuration.
-    # Intialize the library (must be called once before other functions).
-    strip.begin()
-
-    print ('Press Ctrl-C to quit.')
-    if not args.clear:
-        print('Use "-c" argument to clear LEDs on exit')
-        
-    
-    # try:
-
-    #     while True:
-    #         print ('Color wipe animations.')
-    #         colorWipe(strip, Color(255, 0, 0))  # Red wipe
-    #         colorWipe(strip, Color(0, 255, 0))  # Blue wipe
-    #         colorWipe(strip, Color(0, 0, 255))  # Green wipe
-    #         print ('Theater chase animations.')
-    #         theaterChase(strip, Color(127, 127, 127))  # White theater chase
-    #         theaterChase(strip, Color(127,   0,   0))  # Red theater chase
-    #         theaterChase(strip, Color(  0,   0, 127))  # Blue theater chase
-    #         print ('Rainbow animations.')
-    #         rainbow(strip)
-    #         rainbowCycle(strip)
-    #         theaterChaseRainbow(strip)
-
-    # except KeyboardInterrupt:
-    #     if args.clear:
-    #         colorWipe(strip, Color(0,0,0), 10)
-"""
